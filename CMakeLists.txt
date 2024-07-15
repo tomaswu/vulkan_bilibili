@@ -22,28 +22,30 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(glm_include  "/opt/homebrew/Cellar/glm/1.0.1/include")
     set(glm_libs "/opt/homebrew/Cellar/glm/1.0.1/lib")
     set(SDL2_ROOT /opt/homebrew/Cellar/sdl2/2.30.2/lib/cmake)
-
+    link_directories(${glm_libs})
+    find_package(SDL2 REQUIRED)
 elseif(_host_name STREQUAL "DESKTOP-JN9PKOL")
-    set(glfw_include "D:/data/third_libs/glfw3/include")
-    set(glfw_libs "D:/data/third_libs/glfw3/lib-vc2022")
+    list(APPEND CMAKE_PREFIX_PATH "H:/lib3rd/glm-1.0.1-light/glm")
+    set(glm_include "H:/lib3rd/glm-1.0.1-light/glm")
     set(Vulkan_DIR "C:/VulkanSDK/1.3.268.0/cmake")
-
+    set(SDL2_INCLUDE_DIRS "H:/lib3rd/SDL2-devel-2.26.5-VC/SDL2-2.26.5/include")
+    link_directories("H:/lib3rd/SDL2-devel-2.26.5-VC/SDL2-2.26.5/lib/x64")
 endif()
+
 
 find_package(Vulkan REQUIRED)
 message("vulkan found?::" ${Vulkan_FOUND})
 
 message("vulkan include path::" ${Vulkan_INCLUDE_DIRS})
 
-find_package(SDL2 REQUIRED)
-
 include_directories(${SDL2_INCLUDE_DIRS} ${Vulkan_INCLUDE_DIRS} ${glm_include})
-link_directories(${glm_libs})
 
 file(GLOB srcs "*.cpp" "*.hpp")
 
 add_executable(${pname} ${srcs})
-
-target_link_libraries(${pname} PRIVATE SDL2::SDL2 glm Vulkan::Vulkan)
-
+if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    target_link_libraries(${pname} PRIVATE SDL2::SDL2 glm Vulkan::Vulkan)
+elseif(_host_name STREQUAL "DESKTOP-JN9PKOL")
+    target_link_libraries(${pname} PRIVATE SDL2 Vulkan::Vulkan)
+endif()
 

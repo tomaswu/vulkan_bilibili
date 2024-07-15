@@ -5,6 +5,7 @@
 #include <vector>
 #include "toy2d.hpp"
 
+#undef main
 int main()
 {
     std::cout << "hello vulkan demo!!!" << std::endl;
