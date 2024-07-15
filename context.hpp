@@ -12,7 +12,7 @@ namespace toy2d
     {
 
     public:
-        static void Init(std::vector<const char*> &extensions, CreateSurfaceFunc func,int w,int h);
+        static void Init(std::vector<const char*> &extensions, CreateSurfaceFunc func);
         static void Quit();
         static Context &GetInstance();
 
@@ -37,8 +37,15 @@ namespace toy2d
         vk::Queue presentQueue;
         std::unique_ptr<Swapchain> swapchain;
 
+        void InitSwapchain(int w,int h){
+            swapchain.reset(new Swapchain(w,h));
+        }
+        void DestroySwapchain(){
+            swapchain.reset();
+        }
+
     private:
-        Context(std::vector<const char*> &extensions,CreateSurfaceFunc func,int w,int h);
+        Context(std::vector<const char*> &extensions,CreateSurfaceFunc func);
         static std::unique_ptr<Context> instance_;
 
         void createInstance(std::vector<const char*> &extensions);

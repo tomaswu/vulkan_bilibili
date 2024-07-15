@@ -6,9 +6,9 @@ namespace toy2d
 
     std::unique_ptr<Context> Context::instance_ = nullptr;
 
-    void Context::Init(std::vector<const char*> &extensions,CreateSurfaceFunc func,int w,int h)
+    void Context::Init(std::vector<const char*> &extensions,CreateSurfaceFunc func)
     {
-        instance_.reset(new Context(extensions,func,w,h));
+        instance_.reset(new Context(extensions,func));
     }
 
     void Context::Quit()
@@ -21,15 +21,14 @@ namespace toy2d
         return *instance_;
     }
 
-    Context::Context(std::vector<const char*> &extensions,CreateSurfaceFunc func,int w,int h)
+    Context::Context(std::vector<const char*> &extensions,CreateSurfaceFunc func)
     {
         createInstance(extensions);
         pickPhysicalDevice();
-        queryQueueFamilyIndices(); 
         surface = func(instance);
+        queryQueueFamilyIndices(); 
         createDevice();
         getQueue();
-        swapchain.reset(new Swapchain(w,h));
     }
 
     void Context::createInstance(std::vector<const char*> &extensions)
@@ -51,7 +50,6 @@ namespace toy2d
             std::cout << "extension name:" << extensions[i] << std::endl;
         }
         extensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
-
         appinfo.setApiVersion(VK_API_VERSION_1_3);
         createInfo.setPApplicationInfo(&appinfo);
         createInfo.setFlags(vk::InstanceCreateFlags((VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR)));
@@ -144,14 +142,14 @@ namespace toy2d
         if(queueFamilyIndices.presentQueue.value()==queueFamilyIndices.graphicsQueue.value()){
             vk::DeviceQueueCreateInfo queueCreateInfo;
             queueCreateInfo.setPQueuePriorities(&priorities);
-            queueCreateInfo.setQueueCount(2);
+            queueCreateInfo.setQueueCount(1);
             queueCreateInfo.setQueueFamilyIndex(queueFamilyIndices.graphicsQueue.value());
             queueCreateInfos.push_back(std::move(queueCreateInfo));
         }
         else{
             vk::DeviceQueueCreateInfo queueCreateInfo;
             queueCreateInfo.setPQueuePriorities(&priorities);
-            queueCreateInfo.setQueueCount(1);
+            queueCreateInfo.setQueueCount(2);
             queueCreateInfo.setQueueFamilyIndex(queueFamilyIndices.graphicsQueue.value());
             queueCreateInfos.push_back(queueCreateInfo);
 
@@ -165,6 +163,7 @@ namespace toy2d
    
         createInfo.setEnabledExtensionCount(1);
         std::vector<const char*> extensionNames ={"VK_KHR_portability_subset"};
+        extensionNames.emplace_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
         createInfo.setPEnabledExtensionNames(extensionNames);
         device = physical_device.createDevice(createInfo);
     }
@@ -178,6 +177,7 @@ namespace toy2d
             if(support){
                 queueFamilyIndices.graphicsQueue=i;
             }
+            std::cout << surface << std::endl;
             if(physical_device.getSurfaceSupportKHR(i,surface)){
                 queueFamilyIndices.presentQueue = i;
             }
@@ -197,7 +197,6 @@ namespace toy2d
     Context::~Context()
     {
         //! 特别注意，vulkan的销毁是有顺序的,和创建顺序相反
-        swapchain.reset();
         device.destroy();
         instance.destroy();
     }

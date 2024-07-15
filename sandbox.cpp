@@ -39,6 +39,7 @@ int main()
         if(!SDL_Vulkan_CreateSurface(window,instance,&surface)){
             throw std::runtime_error("create surface failed!");
         }
+        std::cout << "create surface!" << std::endl;
         return surface; },
         1024,
         720);

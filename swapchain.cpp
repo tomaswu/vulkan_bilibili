@@ -17,14 +17,15 @@ namespace toy2d
         createinfo.setImageFormat(info.format.format);
         createinfo.setImageExtent(info.imageExtent);
         createinfo.setMinImageCount(info.imageCount);
-
+        createinfo.setPresentMode(info.present_mode);
+        
         auto &queueIndices = Context::GetInstance().queueFamilyIndices;
-        std::array indices = {queueIndices.graphicsQueue.value(),queueIndices.presentQueue.value()};
         if(queueIndices.graphicsQueue.value()==queueIndices.presentQueue.value()){
              createinfo.setQueueFamilyIndices(queueIndices.graphicsQueue.value());
              //如果一个图像被多个命令队列使用，就需要指定一下使用方式。这里指定只能被一个队列使用。
              createinfo.setImageSharingMode(vk::SharingMode::eExclusive);
         }else{
+            std::array indices = {queueIndices.graphicsQueue.value(),queueIndices.presentQueue.value()};
             createinfo.setQueueFamilyIndices(indices);
             // concurrent表示并行
             createinfo.setImageSharingMode(vk::SharingMode::eConcurrent);
@@ -36,7 +37,8 @@ namespace toy2d
     void Swapchain::queryInfo(int w, int h)
     {
         auto &phyDevice = Context::GetInstance().physical_device;
-        auto formats = phyDevice.getSurfaceFormatsKHR();
+        auto &surface = Context::GetInstance().surface;
+        auto formats = phyDevice.getSurfaceFormatsKHR(surface);
         info.format = formats[0]; // 给它一个默认值
         for (const auto &format : formats)
         {
@@ -47,7 +49,6 @@ namespace toy2d
                 break;
             }
         }
-        auto &surface = Context::GetInstance().surface;
         auto capabilities = phyDevice.getSurfaceCapabilitiesKHR(surface);
         // clamp就是将设置值夹在最小和最大值之间
         info.imageCount = std::clamp<uint32_t>(2,capabilities.minImageCount, capabilities.maxImageCount);
