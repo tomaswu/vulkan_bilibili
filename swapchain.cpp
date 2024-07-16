@@ -18,14 +18,17 @@ namespace toy2d
         createinfo.setImageExtent(info.imageExtent);
         createinfo.setMinImageCount(info.imageCount);
         createinfo.setPresentMode(info.present_mode);
-        
+
         auto &queueIndices = Context::GetInstance().queueFamilyIndices;
-        if(queueIndices.graphicsQueue.value()==queueIndices.presentQueue.value()){
-             createinfo.setQueueFamilyIndices(queueIndices.graphicsQueue.value());
-             //如果一个图像被多个命令队列使用，就需要指定一下使用方式。这里指定只能被一个队列使用。
-             createinfo.setImageSharingMode(vk::SharingMode::eExclusive);
-        }else{
-            std::array indices = {queueIndices.graphicsQueue.value(),queueIndices.presentQueue.value()};
+        if (queueIndices.graphicsQueue.value() == queueIndices.presentQueue.value())
+        {
+            createinfo.setQueueFamilyIndices(queueIndices.graphicsQueue.value());
+            // 如果一个图像被多个命令队列使用，就需要指定一下使用方式。这里指定只能被一个队列使用。
+            createinfo.setImageSharingMode(vk::SharingMode::eExclusive);
+        }
+        else
+        {
+            std::array indices = {queueIndices.graphicsQueue.value(), queueIndices.presentQueue.value()};
             createinfo.setQueueFamilyIndices(indices);
             // concurrent表示并行
             createinfo.setImageSharingMode(vk::SharingMode::eConcurrent);
@@ -51,9 +54,9 @@ namespace toy2d
         }
         auto capabilities = phyDevice.getSurfaceCapabilitiesKHR(surface);
         // clamp就是将设置值夹在最小和最大值之间
-        info.imageCount = std::clamp<uint32_t>(2,capabilities.minImageCount, capabilities.maxImageCount);
-        info.imageExtent.width = std::clamp<uint32_t>(w,capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
-        info.imageExtent.height = std::clamp<uint32_t>(h,capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+        info.imageCount = std::clamp<uint32_t>(2, capabilities.minImageCount, capabilities.maxImageCount);
+        info.imageExtent.width = std::clamp<uint32_t>(w, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+        info.imageExtent.height = std::clamp<uint32_t>(h, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
         info.transform = capabilities.currentTransform;
         info.present_mode = vk::PresentModeKHR::eFifo;
         auto presents = phyDevice.getSurfacePresentModesKHR(surface);
@@ -66,16 +69,45 @@ namespace toy2d
             mailbox 假设屏幕上有个信箱，每次从里面取一个，里面也只有一个，向屏幕发送时，覆盖掉没有绘制的图像，也即只绘制最新的图像，一般游戏中都是这种
         */
 
-        for (auto &p:presents){
-            if(p==vk::PresentModeKHR::eMailbox){
-               info.present_mode = p; 
+        for (auto &p : presents)
+        {
+            if (p == vk::PresentModeKHR::eMailbox)
+            {
+                info.present_mode = p;
             }
         }
+    }
 
+    void Swapchain::getImages()
+    {
+        images = Context::GetInstance().device.getSwapchainImagesKHR(swapchain);
+    }
+
+    void Swapchain::createImageViews()
+    {
+        imageViews.resize(images.size());
+        for (int i = 0; i < images.size(); i++)
+        {
+            vk::ImageViewCreateInfo create_info;
+            vk::ComponentMapping mapping;
+            vk::ImageSubresourceRange range;
+            range.setBaseMipLevel(0);
+            range.setLevelCount(1);
+            range.setLayerCount(1);
+            range.setAspectMask(vk::ImageAspectFlagBits::eColor);
+            create_info.setImage(images[i]);
+            create_info.setViewType(vk::ImageViewType::e2D);
+            create_info.setComponents(mapping);
+            create_info.setSubresourceRange(range);
+            imageViews[i] = Context::GetInstance().device.createImageView(create_info);
+        }
     }
 
     Swapchain::~Swapchain()
     {
+        for(auto &imageView : imageViews){
+            Context::GetInstance().device.destroyImageView(imageView);
+        }
         Context::GetInstance().device.destroySwapchainKHR(swapchain);
     }
 

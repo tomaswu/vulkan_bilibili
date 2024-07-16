@@ -23,6 +23,12 @@ namespace toy2d
 
         SwapchainInfo info;
         void queryInfo(int w,int h);
+        std::vector<vk::Image> images;
+        std::vector<vk::ImageView> imageViews;
+
+        void getImages();
+        void createImageViews();
+        
 
     private:
     };
