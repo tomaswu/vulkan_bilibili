@@ -7,11 +7,13 @@ namespace toy2d
     {
         Context::Init(extensions,func);
         Context::GetInstance().InitSwapchain(w,h);
+        Shader::Init(ReadModuleFile("./vert.spv"),ReadModuleFile("./frag.spv"));
     }
 
     void Quit()
     {
         Context::GetInstance().DestroySwapchain();
+        Shader::Quit();
         Context::Quit();
     }
 

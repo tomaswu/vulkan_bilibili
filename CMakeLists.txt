@@ -32,6 +32,13 @@ elseif(_host_name STREQUAL "DESKTOP-JN9PKOL")
     link_directories("H:/lib3rd/SDL2-devel-2.26.5-VC/SDL2-2.26.5/lib/x64")
 endif()
 
+#*****************
+find_program(GLSLC_PROGRAM glslc REQUIRED)
+execute_process(COMMAND ${GLSLC_PROGRAM} ${CMAKE_SOURCE_DIR}/shader/shader.vert -o ${CMAKE_SOURCE_DIR}/shader/vert.spv)
+execute_process(COMMAND ${GLSLC_PROGRAM} ${CMAKE_SOURCE_DIR}/shader/shader.frag -o ${CMAKE_SOURCE_DIR}/shader/frag.spv)
+file(COPY ${CMAKE_SOURCE_DIR}/shader/vert.spv ${CMAKE_SOURCE_DIR}/shader/frag.spv DESTINATION ${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}/shader)
+
+#*****************
 
 find_package(Vulkan REQUIRED)
 message("vulkan found?::" ${Vulkan_FOUND})
@@ -48,4 +55,14 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 elseif(_host_name STREQUAL "DESKTOP-JN9PKOL")
     target_link_libraries(${pname} PRIVATE SDL2 Vulkan::Vulkan)
 endif()
+
+
+
+
+
+
+
+
+
+
 
