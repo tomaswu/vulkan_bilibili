@@ -14,9 +14,11 @@ namespace toy2d
         vk::ShaderModule vertex_module;
         vk::ShaderModule fragment_module;
 
+        ~Shader();
+
     private:
         Shader(const std::string& vertex_source, const std::string& fragment_source);
-        ~Shader();
+        
 
         static std::unique_ptr<Shader> instance_;
     };

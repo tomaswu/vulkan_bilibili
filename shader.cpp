@@ -12,7 +12,9 @@ namespace toy2d
 
     void Shader::Quit()
     {
+        instance_.reset();
     }
+
     Shader &Shader::GetInstance()
     {
         return *instance_; 

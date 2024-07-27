@@ -12,8 +12,8 @@ namespace toy2d
 
     void Quit()
     {
-        Context::GetInstance().DestroySwapchain();
         Shader::Quit();
+        Context::GetInstance().DestroySwapchain();
         Context::Quit();
     }
 

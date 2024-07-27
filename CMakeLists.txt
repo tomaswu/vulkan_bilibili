@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.28)
 
 set(pname vkbilibili)
 message(name:: ${pname})
@@ -36,7 +36,7 @@ endif()
 find_program(GLSLC_PROGRAM glslc REQUIRED)
 execute_process(COMMAND ${GLSLC_PROGRAM} ${CMAKE_SOURCE_DIR}/shader/shader.vert -o ${CMAKE_SOURCE_DIR}/shader/vert.spv)
 execute_process(COMMAND ${GLSLC_PROGRAM} ${CMAKE_SOURCE_DIR}/shader/shader.frag -o ${CMAKE_SOURCE_DIR}/shader/frag.spv)
-file(COPY ${CMAKE_SOURCE_DIR}/shader/vert.spv ${CMAKE_SOURCE_DIR}/shader/frag.spv DESTINATION ${CMAKE_BINARY_DIR}/${CMAKE_BUILD_TYPE}/shader)
+file(COPY ${CMAKE_SOURCE_DIR}/shader/vert.spv ${CMAKE_SOURCE_DIR}/shader/frag.spv DESTINATION ${CMAKE_BINARY_DIR})
 
 #*****************
 
