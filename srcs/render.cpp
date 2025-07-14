@@ -10,7 +10,7 @@ Render::Render(SDL_Window *window)
 {
     window_ = window;
     auto app_info = vk::ApplicationInfo();
-    app_info.setApiVersion(VK_MAKE_VERSION(1, 3, 0));
+    app_info.setApiVersion(VK_API_VERSION_1_3);
     auto create_info = vk::InstanceCreateInfo();
     create_info.setPApplicationInfo(&app_info);
 
