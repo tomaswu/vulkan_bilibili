@@ -4,6 +4,7 @@ project(DemoProject)
 set(CMAKE_CXX_STANDARD 17)
 
 list(APPEND CMAKE_PREFIX_PATH "C:/VulkanSDK/1.3.268.0")
+list(APPEND CMAKE_PREFIX_PATH "E:/work_data/third_libs/vulkan")
 
 find_package(Vulkan REQUIRED)
 
