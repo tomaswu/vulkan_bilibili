@@ -1,6 +1,10 @@
 {
     "cmake.generator": "Ninja",
     "files.associations": {
-        "vector": "cpp"
+        "vector": "cpp",
+        "optional": "cpp",
+        "iostream": "cpp",
+        "array": "cpp",
+        "algorithm": "cpp"
     }
 }

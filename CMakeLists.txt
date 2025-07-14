@@ -15,7 +15,7 @@ target_include_directories(demo PRIVATE "E:/work_data/third_libs/sdl3/include")
 
 
 target_link_libraries(demo PRIVATE 
-    "E:/work_data/third_libs/sdl3/lib/SDL3-static.lib"
+    "E:/work_data/third_libs/sdl3/lib/mingw/libSDL3.a"
     winmm
     setupapi
     version

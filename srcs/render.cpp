@@ -66,7 +66,7 @@ Render::Render(SDL_Window *window)
     std::vector<vk::DeviceQueueCreateInfo> device_queue_create_infos;
     float queue_priority = 1.0f;
 
-    if (queue_family_indices.graphics_queue.value()!=queue_family_indices.present_queue.value()){
+    if (queue_family_indices.graphics_queue.value()==queue_family_indices.present_queue.value()){
         vk::DeviceQueueCreateInfo device_queue_create_info;
         device_queue_create_info.setPQueuePriorities(&queue_priority)
         .setQueueCount(1)
@@ -88,13 +88,22 @@ Render::Render(SDL_Window *window)
     }
 
     device_cerate_info.setQueueCreateInfos(device_queue_create_infos);
-
+    
+    // Enable swapchain extension
+    const std::vector<const char*> deviceExtensions = {
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+    };
+    device_cerate_info.setEnabledExtensionCount(static_cast<uint32_t>(deviceExtensions.size()));
+    device_cerate_info.setPpEnabledExtensionNames(deviceExtensions.data());
+    
     device_ = physical_device_.createDevice(device_cerate_info);
 
     getQueues();
 
     // 创建交换链
-    querySwapchainInfo(window_->width, window_->height);
+    int width, height;
+    SDL_GetWindowSize(window_, &width, &height);
+    querySwapchainInfo(width, height);
     vk::SwapchainCreateInfoKHR swapchain_create_info;
     swapchain_create_info.setClipped(true)
                          .setImageArrayLayers(1)
@@ -115,6 +124,7 @@ Render::Render(SDL_Window *window)
         swapchain_create_info.setQueueFamilyIndices(indices)
                              .setImageSharingMode(vk::SharingMode::eConcurrent);
     }
+
     swapchain_ = device_.createSwapchainKHR(swapchain_create_info);
 }
 
@@ -122,6 +132,7 @@ Render::~Render()
 {
     device_.destroySwapchainKHR(swapchain_);
     device_.destroy();
+    instance_.destroySurfaceKHR(surface_);
     instance_.destroy();
 }
 
