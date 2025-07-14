@@ -18,10 +18,29 @@ class Render{
 
         struct QueueFamilyIndices final{
             std::optional<uint32_t> graphics_queue;
+            std::optional<uint32_t> present_queue;
+            operator bool() const{
+                return graphics_queue.has_value() && present_queue.has_value();
+            }
         };
 
         QueueFamilyIndices queue_family_indices;
         vk::Queue graphics_queue;
+        vk::Queue present_queue;
+
+        vk::SwapchainKHR swapchain_{nullptr};
+
+        struct SwapchainInfo final{
+            vk::Extent2D extent;
+            uint32_t image_count;
+            vk::SurfaceFormatKHR image_format;
+            vk::SurfaceTransformFlagsKHR transform;
+            vk::PresentModeKHR present_mode;
+        };
+
+        SwapchainInfo swapchain_info;
+
+        void querySwapchainInfo(int width, int height);
 
         void queryQueueFamilyIndices();
         void getQueues();

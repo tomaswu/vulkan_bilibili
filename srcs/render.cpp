@@ -1,6 +1,10 @@
 #include "render.hpp"
 #include <SDL3/SDL_vulkan.h>
 #include <iostream>
+#include <array>
+#include <vector>
+#include <algorithm>
+#include <SDL3/SDL.h>
 
 Render::Render(SDL_Window *window)
 {
@@ -59,21 +63,64 @@ Render::Render(SDL_Window *window)
 
     // 创建逻辑设备
     vk::DeviceCreateInfo device_cerate_info;
-    vk::DeviceQueueCreateInfo device_queue_create_info;
+    std::vector<vk::DeviceQueueCreateInfo> device_queue_create_infos;
     float queue_priority = 1.0f;
-    device_queue_create_info.setPQueuePriorities(&queue_priority)
-    .setQueueCount(1)
-    .setQueueFamilyIndex(queue_family_indices.graphics_queue.value());
 
-    device_cerate_info.setQueueCreateInfos(device_queue_create_info);
+    if (queue_family_indices.graphics_queue.value()!=queue_family_indices.present_queue.value()){
+        vk::DeviceQueueCreateInfo device_queue_create_info;
+        device_queue_create_info.setPQueuePriorities(&queue_priority)
+        .setQueueCount(1)
+        .setQueueFamilyIndex(queue_family_indices.graphics_queue.value());
+        device_queue_create_infos.push_back(device_queue_create_info);
+    }
+    else{
+        vk::DeviceQueueCreateInfo present_queue_create_info;
+        present_queue_create_info.setPQueuePriorities(&queue_priority)
+        .setQueueCount(1)
+        .setQueueFamilyIndex(queue_family_indices.present_queue.value());
+        device_queue_create_infos.push_back(present_queue_create_info);
+
+        vk::DeviceQueueCreateInfo device_queue_create_info;
+        device_queue_create_info.setPQueuePriorities(&queue_priority)
+        .setQueueCount(1)
+        .setQueueFamilyIndex(queue_family_indices.graphics_queue.value());
+        device_queue_create_infos.push_back(device_queue_create_info); 
+    }
+
+    device_cerate_info.setQueueCreateInfos(device_queue_create_infos);
 
     device_ = physical_device_.createDevice(device_cerate_info);
 
     getQueues();
+
+    // 创建交换链
+    querySwapchainInfo(window_->width, window_->height);
+    vk::SwapchainCreateInfoKHR swapchain_create_info;
+    swapchain_create_info.setClipped(true)
+                         .setImageArrayLayers(1)
+                         .setImageUsage(vk::ImageUsageFlagBits::eColorAttachment)
+                         .setCompositeAlpha(vk::CompositeAlphaFlagBitsKHR::eOpaque)
+                         .setSurface(surface_)
+                         .setImageColorSpace(swapchain_info.image_format.colorSpace)
+                         .setImageFormat(swapchain_info.image_format.format)
+                         .setImageExtent(swapchain_info.extent)
+                         .setMinImageCount(swapchain_info.image_count)
+                         .setPresentMode(swapchain_info.present_mode);
+    if(queue_family_indices.graphics_queue.value()==queue_family_indices.present_queue.value()){
+        swapchain_create_info.setQueueFamilyIndices(queue_family_indices.graphics_queue.value())
+                             .setImageSharingMode(vk::SharingMode::eExclusive);
+    }
+    else{
+        std::array indices = {queue_family_indices.graphics_queue.value(), queue_family_indices.present_queue.value()};
+        swapchain_create_info.setQueueFamilyIndices(indices)
+                             .setImageSharingMode(vk::SharingMode::eConcurrent);
+    }
+    swapchain_ = device_.createSwapchainKHR(swapchain_create_info);
 }
 
 Render::~Render()
 {
+    device_.destroySwapchainKHR(swapchain_);
     device_.destroy();
     instance_.destroy();
 }
@@ -81,6 +128,33 @@ Render::~Render()
 void Render::render()
 {
 
+}
+
+void Render::querySwapchainInfo(int width, int height)
+{
+    auto formats = physical_device_.getSurfaceFormatsKHR(surface_);
+    swapchain_info.image_format = formats[0];
+    for(const auto& format:formats){
+        if(format.format==vk::Format::eR8G8B8A8Srgb 
+        && format.colorSpace==vk::ColorSpaceKHR::eSrgbNonlinear){
+            swapchain_info.image_format = format;
+            break;
+        }
+    }
+    auto capabilities = physical_device_.getSurfaceCapabilitiesKHR(surface_);
+    swapchain_info.image_count = std::clamp<uint32_t>(2, capabilities.minImageCount, capabilities.maxImageCount);
+    swapchain_info.extent.width = std::clamp<uint32_t>(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+    swapchain_info.extent.height = std::clamp<uint32_t>(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+    swapchain_info.transform = capabilities.currentTransform;
+
+    auto present_modes = physical_device_.getSurfacePresentModesKHR(surface_);
+    swapchain_info.present_mode = vk::PresentModeKHR::eFifo;
+    for(const auto& mode:present_modes){
+        if(mode==vk::PresentModeKHR::eMailbox){
+            swapchain_info.present_mode = mode;
+            break;
+        }
+    }
 }
 
 void Render::queryQueueFamilyIndices()
@@ -91,6 +165,11 @@ void Render::queryQueueFamilyIndices()
         auto &p = queue_family_properties[i];
         if(p.queueFlags & vk::QueueFlagBits::eGraphics){
             queue_family_indices.graphics_queue = i;
+        }
+        if (physical_device_.getSurfaceSupportKHR(i, surface_)){
+            queue_family_indices.present_queue = i;
+        }
+        if (queue_family_indices){
             break;
         }
     }
@@ -99,4 +178,5 @@ void Render::queryQueueFamilyIndices()
 void Render::getQueues()
 {
     graphics_queue = device_.getQueue(queue_family_indices.graphics_queue.value(), 0);
+    present_queue = device_.getQueue(queue_family_indices.present_queue.value(), 0);
 }
