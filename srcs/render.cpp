@@ -140,6 +140,11 @@ Render::Render(SDL_Window *window)
 
 Render::~Render()
 {
+    // 等待设备空闲，确保所有操作完成
+    device_.waitIdle();
+    
+    device_.destroySemaphore(image_available_semaphore);
+    device_.destroySemaphore(render_finished_semaphore);
     device_.destroyFence(cmd_avaliable_fence);
     device_.freeCommandBuffers(command_pool, command_buffer);
     device_.destroyCommandPool(command_pool);
@@ -164,7 +169,7 @@ void Render::render()
 {
     int width,height;
     SDL_GetWindowSize(window_, &width, &height);
-    auto res = device_.acquireNextImageKHR(swapchain_, UINT64_MAX);
+    auto res = device_.acquireNextImageKHR(swapchain_, UINT64_MAX, image_available_semaphore, nullptr);
 
     if (res.result!=vk::Result::eSuccess){
         std::cout<<"acquire next image khr error"<<std::endl;
@@ -175,28 +180,38 @@ void Render::render()
     vk::CommandBufferBeginInfo begin;
     begin.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
     command_buffer.begin(begin);
-    command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics,pipeline);
     vk::RenderPassBeginInfo renderpass_begin;
+    vk::Rect2D render_area;
+    render_area.setOffset({0,0})
+               .setExtent(swapchain_info.extent);
     vk::ClearValue clear_value;
     clear_value.color = vk::ClearColorValue(std::array<float,4>{0.1f,0.1f,0.1f,1.0f});
     renderpass_begin.setRenderPass(this->render_pass)
-                    .setRenderArea(vk::Rect2D(vk::Offset2D(0, 0), vk::Extent2D(static_cast<uint32_t>(width), static_cast<uint32_t>(height))))
+                    .setRenderArea(render_area)
                     .setFramebuffer(this->framebuffers[image_index])
                     .setClearValues(clear_value);
     command_buffer.beginRenderPass(renderpass_begin,{});
-    command_buffer.endRenderPass();
+    command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics,pipeline);
     command_buffer.draw(3,1,0,0);
+    command_buffer.endRenderPass();
+    command_buffer.end();
 
     vk::SubmitInfo submit_info;
-    submit_info.setCommandBuffers(command_buffer);
-    graphics_queue.submit(submit_info);
+    // 添加信号量同步
+    vk::PipelineStageFlags wait_stage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+    submit_info.setWaitSemaphores(image_available_semaphore)
+               .setWaitDstStageMask(wait_stage)
+               .setSignalSemaphores(render_finished_semaphore)
+               .setCommandBuffers(command_buffer);
+    graphics_queue.submit(submit_info,cmd_avaliable_fence);
 
     if(device_.waitForFences(cmd_avaliable_fence,true,UINT64_MAX)!=vk::Result::eSuccess){
         std::cout<<"wait fence error"<<std::endl;
     }
 
     vk::PresentInfoKHR present;
-    present.setImageIndices(image_index)
+    present.setWaitSemaphores(render_finished_semaphore)
+           .setImageIndices(image_index)
            .setSwapchains(swapchain_);
     auto ret = present_queue.presentKHR(present);
     if(ret!=vk::Result::eSuccess){
@@ -365,7 +380,7 @@ void Render::createPipeline()
     vk::PipelineRasterizationStateCreateInfo rasterization_create_info;
     rasterization_create_info.setRasterizerDiscardEnable(false)
                              .setCullMode(vk::CullModeFlagBits::eBack)
-                             .setFrontFace(vk::FrontFace::eCounterClockwise)
+                             .setFrontFace(vk::FrontFace::eClockwise)
                              .setPolygonMode(vk::PolygonMode::eFill)
                              .setLineWidth(1.0f);
     pipeline_create_info.setPRasterizationState(&rasterization_create_info);
@@ -463,4 +478,8 @@ void Render::createFence()
 {
     vk::FenceCreateInfo info;
     cmd_avaliable_fence = device_.createFence(info);
+
+    vk::SemaphoreCreateInfo semaphore_info;
+    image_available_semaphore = device_.createSemaphore(semaphore_info);
+    render_finished_semaphore = device_.createSemaphore(semaphore_info);
 }

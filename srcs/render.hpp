@@ -54,6 +54,8 @@ class Render{
         vk::CommandPool command_pool;
         vk::CommandBuffer command_buffer;
         vk::Fence cmd_avaliable_fence;
+        vk::Semaphore image_available_semaphore;
+        vk::Semaphore render_finished_semaphore;
 
         void querySwapchainInfo(int width, int height);
 
