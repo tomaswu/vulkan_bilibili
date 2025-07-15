@@ -61,7 +61,7 @@ class Render{
         vk::CommandBuffer command_buffer;
         vk::Fence cmd_avaliable_fence;
         vk::Semaphore image_available_semaphore;
-        vk::Semaphore render_finished_semaphore;
+        std::vector<vk::Semaphore> render_finished_semaphores;
 
         vk::Buffer vertex_buffer;
         vk::DeviceMemory vertex_buffer_memory;

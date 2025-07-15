@@ -147,7 +147,9 @@ Render::~Render()
     device_.freeMemory(vertex_buffer_memory);
     device_.destroyBuffer(vertex_buffer);
     device_.destroySemaphore(image_available_semaphore);
-    device_.destroySemaphore(render_finished_semaphore);
+    for(auto& semaphore : render_finished_semaphores) {
+        device_.destroySemaphore(semaphore);
+    }
     device_.destroyFence(cmd_avaliable_fence);
     device_.freeCommandBuffers(command_pool, command_buffer);
     device_.destroyCommandPool(command_pool);
@@ -230,7 +232,7 @@ void Render::render()
     vk::PipelineStageFlags wait_stage = vk::PipelineStageFlagBits::eColorAttachmentOutput;
     submit_info.setWaitSemaphores(image_available_semaphore)
                .setWaitDstStageMask(wait_stage)
-               .setSignalSemaphores(render_finished_semaphore)
+               .setSignalSemaphores(render_finished_semaphores[image_index])
                .setCommandBuffers(command_buffer);
     graphics_queue.submit(submit_info,cmd_avaliable_fence);
 
@@ -239,7 +241,7 @@ void Render::render()
     }
 
     vk::PresentInfoKHR present;
-    present.setWaitSemaphores(render_finished_semaphore)
+    present.setWaitSemaphores(render_finished_semaphores[image_index])
            .setImageIndices(image_index)
            .setSwapchains(swapchain_);
     auto ret = present_queue.presentKHR(present);
@@ -515,7 +517,13 @@ void Render::createFence()
 
     vk::SemaphoreCreateInfo semaphore_info;
     image_available_semaphore = device_.createSemaphore(semaphore_info);
-    render_finished_semaphore = device_.createSemaphore(semaphore_info);
+    
+    // 为每个交换链图像创建单独的渲染完成信号量
+    auto images = device_.getSwapchainImagesKHR(swapchain_);
+    render_finished_semaphores.resize(images.size());
+    for(size_t i = 0; i < images.size(); i++) {
+        render_finished_semaphores[i] = device_.createSemaphore(semaphore_info);
+    }
 }
 
 void Render::createVertexBuffer()
