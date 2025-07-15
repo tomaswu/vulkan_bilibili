@@ -136,6 +136,7 @@ Render::Render(SDL_Window *window)
     createPipeline();
     createCommandPool();
     createFence();
+    createVertexBuffer();
 }
 
 Render::~Render()
@@ -143,6 +144,8 @@ Render::~Render()
     // 等待设备空闲，确保所有操作完成
     device_.waitIdle();
     
+    device_.freeMemory(vertex_buffer_memory);
+    device_.destroyBuffer(vertex_buffer);
     device_.destroySemaphore(image_available_semaphore);
     device_.destroySemaphore(render_finished_semaphore);
     device_.destroyFence(cmd_avaliable_fence);
@@ -167,6 +170,17 @@ Render::~Render()
 
 void Render::render()
 {
+
+    std::array<Vertex,3> vertices = {
+        Vertex{0.0f,0.5f},
+        Vertex{0.5f,-0.5f},
+        Vertex{-0.5f,-0.5f}
+    };
+
+    void* ptr = device_.mapMemory(vertex_buffer_memory,0,vertex_buffer_size);
+    memcpy(ptr,vertices.data(),vertex_buffer_size);
+    device_.unmapMemory(vertex_buffer_memory);
+
     int width,height;
     SDL_GetWindowSize(window_, &width, &height);
     auto res = device_.acquireNextImageKHR(swapchain_, UINT64_MAX, image_available_semaphore, nullptr);
@@ -192,6 +206,8 @@ void Render::render()
                     .setClearValues(clear_value);
     command_buffer.beginRenderPass(renderpass_begin,{});
     command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics,pipeline);
+    vk::DeviceSize offset = {0};
+    command_buffer.bindVertexBuffers(0,vertex_buffer,offset); //offset指如果有多个buffer，从哪个开始
     command_buffer.draw(3,1,0,0);
     command_buffer.endRenderPass();
     command_buffer.end();
@@ -347,6 +363,11 @@ void Render::createPipeline()
 
     // 1. vertex input
     vk::PipelineVertexInputStateCreateInfo state_create_info;
+    auto attr = Vertex::getAttribute();
+    auto binding = Vertex::getBinding();
+    state_create_info.setVertexAttributeDescriptions(attr)
+                     .setVertexBindingDescriptions(binding);
+
     pipeline_create_info.setPVertexInputState(&state_create_info);
 
     // 2. vertex assembly
@@ -482,4 +503,38 @@ void Render::createFence()
     vk::SemaphoreCreateInfo semaphore_info;
     image_available_semaphore = device_.createSemaphore(semaphore_info);
     render_finished_semaphore = device_.createSemaphore(semaphore_info);
+}
+
+void Render::createVertexBuffer()
+{
+    vk::BufferCreateInfo buffer_create_info;
+    buffer_create_info.setSize(vertex_buffer_size)
+                      .setUsage(vk::BufferUsageFlagBits::eVertexBuffer);
+    vertex_buffer = device_.createBuffer(buffer_create_info);
+
+    auto requirements = device_.getBufferMemoryRequirements(vertex_buffer);
+    auto properties = physical_device_.getMemoryProperties();
+
+    size_t size = requirements.size;
+    uint32_t type_index = 0;
+
+    for(int i=0;i<properties.memoryTypeCount;i++){
+        if((i<<1)&requirements.memoryTypeBits &&
+        properties.memoryTypes[i].propertyFlags &
+        (vk::MemoryPropertyFlagBits::eHostVisible|vk::MemoryPropertyFlagBits::eHostCoherent)
+        )
+        {
+            type_index = i;
+            break;
+        }
+    }
+    
+    vk::MemoryAllocateInfo memory_allocate_info;
+    memory_allocate_info.setMemoryTypeIndex(type_index)
+                        .setAllocationSize(size);
+
+    vertex_buffer_memory = device_.allocateMemory(memory_allocate_info);
+
+    device_.bindBufferMemory(vertex_buffer,vertex_buffer_memory,0);
+
 }

@@ -1,6 +1,7 @@
 #include <vulkan/vulkan.hpp>
 #include <SDL3/SDL.h>
 #include <optional>
+#include "vertex.hpp"
 
 class Render{
     public:
@@ -57,6 +58,10 @@ class Render{
         vk::Semaphore image_available_semaphore;
         vk::Semaphore render_finished_semaphore;
 
+        vk::Buffer vertex_buffer;
+        vk::DeviceMemory vertex_buffer_memory;
+        size_t vertex_buffer_size{24};
+
         void querySwapchainInfo(int width, int height);
 
         void queryQueueFamilyIndices();
@@ -71,4 +76,5 @@ class Render{
 
         void createCommandPool();
         void createFence();
+        void createVertexBuffer();
 };
