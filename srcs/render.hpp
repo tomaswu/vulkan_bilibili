@@ -11,6 +11,10 @@ class Render{
         void render();
 
     private:
+        //test
+            size_t frame_count{0};
+        // end test
+
         SDL_Window* window_{nullptr};
         vk::Instance instance_{nullptr};
         vk::SurfaceKHR surface_{nullptr};

@@ -177,6 +177,9 @@ void Render::render()
         Vertex{-0.5f,-0.5f}
     };
 
+    // frame_count++;
+    // std::cout<<"frame_count: "<<frame_count<<std::endl;
+
     void* ptr = device_.mapMemory(vertex_buffer_memory,0,vertex_buffer_size);
     memcpy(ptr,vertices.data(),vertex_buffer_size);
     device_.unmapMemory(vertex_buffer_memory);
