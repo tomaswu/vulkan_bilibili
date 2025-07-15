@@ -171,14 +171,24 @@ Render::~Render()
 void Render::render()
 {
 
+    y+=delata;
+    if(y>1.0f){
+        delata = -0.0001;
+    }
+    if(y<-1.0f){
+        delata = 0.0001;
+    }
+
     std::array<Vertex,3> vertices = {
-        Vertex{0.0f,0.5f},
-        Vertex{0.5f,-0.5f},
-        Vertex{-0.5f,-0.5f}
+        Vertex{0.0f,y},
+        Vertex{0.5f,0.f},
+        Vertex{-0.5f,0.f}
     };
 
-    // frame_count++;
-    // std::cout<<"frame_count: "<<frame_count<<std::endl;
+    if(y > 0.0f){
+        std::swap(vertices[1], vertices[2]);
+    }
+    
 
     void* ptr = device_.mapMemory(vertex_buffer_memory,0,vertex_buffer_size);
     memcpy(ptr,vertices.data(),vertex_buffer_size);
@@ -394,8 +404,8 @@ void Render::createPipeline()
     vk::PipelineViewportStateCreateInfo viewport_state_create_info;
     int width, height;
     SDL_GetWindowSize(window_, &width, &height);
-    vk::Viewport viewport(0.,0.,width,height,0.,1.);
-    vk::Rect2D scissor(vk::Offset2D(0, 0), vk::Extent2D(static_cast<uint32_t>(width), static_cast<uint32_t>(height)));
+    vk::Viewport viewport(0.,0.,swapchain_info.extent.width,swapchain_info.extent.height,0.,1.);
+    vk::Rect2D scissor(vk::Offset2D(0, 0), swapchain_info.extent);
     viewport_state_create_info.setViewports(viewport)
                         .setScissors(scissor);
     pipeline_create_info.setPViewportState(&viewport_state_create_info);
@@ -510,6 +520,7 @@ void Render::createFence()
 
 void Render::createVertexBuffer()
 {
+    vertex_buffer_size = sizeof(Vertex)*3;
     vk::BufferCreateInfo buffer_create_info;
     buffer_create_info.setSize(vertex_buffer_size)
                       .setUsage(vk::BufferUsageFlagBits::eVertexBuffer);
@@ -522,7 +533,7 @@ void Render::createVertexBuffer()
     uint32_t type_index = 0;
 
     for(int i=0;i<properties.memoryTypeCount;i++){
-        if((i<<1)&requirements.memoryTypeBits &&
+        if((1<<i)&requirements.memoryTypeBits &&
         properties.memoryTypes[i].propertyFlags &
         (vk::MemoryPropertyFlagBits::eHostVisible|vk::MemoryPropertyFlagBits::eHostCoherent)
         )

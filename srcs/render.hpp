@@ -12,7 +12,8 @@ class Render{
 
     private:
         //test
-            size_t frame_count{0};
+            float delata = 0.0001;
+            float y = 0.5;
         // end test
 
         SDL_Window* window_{nullptr};
