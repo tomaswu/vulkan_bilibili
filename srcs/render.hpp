@@ -51,6 +51,10 @@ class Render{
         vk::RenderPass render_pass;
         std::vector<vk::PipelineShaderStageCreateInfo> shader_stages;
 
+        vk::CommandPool command_pool;
+        vk::CommandBuffer command_buffer;
+        vk::Fence cmd_avaliable_fence;
+
         void querySwapchainInfo(int width, int height);
 
         void queryQueueFamilyIndices();
@@ -62,4 +66,7 @@ class Render{
         void createPipeline();
         void createPipelineLayout();
         void createRenderPass();
+
+        void createCommandPool();
+        void createFence();
 };

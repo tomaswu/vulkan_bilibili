@@ -134,10 +134,15 @@ Render::Render(SDL_Window *window)
     createRenderPass();
     createFramebuffers();
     createPipeline();
+    createCommandPool();
+    createFence();
 }
 
 Render::~Render()
 {
+    device_.destroyFence(cmd_avaliable_fence);
+    device_.freeCommandBuffers(command_pool, command_buffer);
+    device_.destroyCommandPool(command_pool);
     device_.destroyPipeline(pipeline);
     for(auto& framebuffer:framebuffers){
         device_.destroyFramebuffer(framebuffer);
@@ -157,7 +162,47 @@ Render::~Render()
 
 void Render::render()
 {
+    int width,height;
+    SDL_GetWindowSize(window_, &width, &height);
+    auto res = device_.acquireNextImageKHR(swapchain_, UINT64_MAX);
 
+    if (res.result!=vk::Result::eSuccess){
+        std::cout<<"acquire next image khr error"<<std::endl;
+    }
+
+    auto image_index = res.value;
+    command_buffer.reset();
+    vk::CommandBufferBeginInfo begin;
+    begin.setFlags(vk::CommandBufferUsageFlagBits::eOneTimeSubmit);
+    command_buffer.begin(begin);
+    command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics,pipeline);
+    vk::RenderPassBeginInfo renderpass_begin;
+    vk::ClearValue clear_value;
+    clear_value.color = vk::ClearColorValue(std::array<float,4>{0.1f,0.1f,0.1f,1.0f});
+    renderpass_begin.setRenderPass(this->render_pass)
+                    .setRenderArea(vk::Rect2D(vk::Offset2D(0, 0), vk::Extent2D(static_cast<uint32_t>(width), static_cast<uint32_t>(height))))
+                    .setFramebuffer(this->framebuffers[image_index])
+                    .setClearValues(clear_value);
+    command_buffer.beginRenderPass(renderpass_begin,{});
+    command_buffer.endRenderPass();
+    command_buffer.draw(3,1,0,0);
+
+    vk::SubmitInfo submit_info;
+    submit_info.setCommandBuffers(command_buffer);
+    graphics_queue.submit(submit_info);
+
+    if(device_.waitForFences(cmd_avaliable_fence,true,UINT64_MAX)!=vk::Result::eSuccess){
+        std::cout<<"wait fence error"<<std::endl;
+    }
+
+    vk::PresentInfoKHR present;
+    present.setImageIndices(image_index)
+           .setSwapchains(swapchain_);
+    auto ret = present_queue.presentKHR(present);
+    if(ret!=vk::Result::eSuccess){
+        std::cout<<"present error"<<std::endl;
+    }
+    device_.resetFences(cmd_avaliable_fence);
 }
 
 void Render::querySwapchainInfo(int width, int height)
@@ -372,7 +417,7 @@ void Render::createRenderPass()
     vk::AttachmentDescription color_attachment;
     color_attachment.setFormat(swapchain_info.image_format.format)
                     .setInitialLayout(vk::ImageLayout::eUndefined)
-                    .setFinalLayout(vk::ImageLayout::eColorAttachmentOptimal)
+                    .setFinalLayout(vk::ImageLayout::ePresentSrcKHR)
                     .setLoadOp(vk::AttachmentLoadOp::eClear)
                     .setStoreOp(vk::AttachmentStoreOp::eStore)
                     .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
@@ -398,4 +443,24 @@ void Render::createRenderPass()
     render_pass_create_info.setDependencies(dependency);
 
     render_pass = device_.createRenderPass(render_pass_create_info);
+}
+
+void Render::createCommandPool()
+{
+    vk::CommandPoolCreateInfo command_pool_create_info;
+    command_pool_create_info.setFlags(vk::CommandPoolCreateFlagBits::eResetCommandBuffer);
+    command_pool = device_.createCommandPool(command_pool_create_info);
+
+    vk::CommandBufferAllocateInfo command_buffer_allocate_info;
+    command_buffer_allocate_info.setCommandPool(command_pool)
+                                .setLevel(vk::CommandBufferLevel::ePrimary) //primary可以直接被gpu执行，secondary需要被primary调用
+                                .setCommandBufferCount(1);
+    command_buffer = device_.allocateCommandBuffers(command_buffer_allocate_info)[0];
+
+}
+
+void Render::createFence()
+{
+    vk::FenceCreateInfo info;
+    cmd_avaliable_fence = device_.createFence(info);
 }

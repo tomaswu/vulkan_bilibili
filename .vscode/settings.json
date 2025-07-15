@@ -6,6 +6,7 @@
         "iostream": "cpp",
         "array": "cpp",
         "algorithm": "cpp",
-        "random": "cpp"
+        "random": "cpp",
+        "ostream": "cpp"
     }
 }

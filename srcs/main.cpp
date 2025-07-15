@@ -34,6 +34,7 @@ int main() {
                 }
             }
         }
+        render.render();
     }
     SDL_DestroyWindow(win);
     SDL_Quit();
