@@ -5,6 +5,7 @@
 #include <vector>
 #include <algorithm>
 #include <SDL3/SDL.h>
+#include <fstream>
 
 Render::Render(SDL_Window *window)
 {
@@ -126,10 +127,28 @@ Render::Render(SDL_Window *window)
     }
 
     swapchain_ = device_.createSwapchainKHR(swapchain_create_info);
+
+    createImageViews();
+    createShaderModules();
+    createPipelineLayout();
+    createRenderPass();
+    createFramebuffers();
+    createPipeline();
 }
 
 Render::~Render()
 {
+    device_.destroyPipeline(pipeline);
+    for(auto& framebuffer:framebuffers){
+        device_.destroyFramebuffer(framebuffer);
+    }
+    device_.destroyRenderPass(render_pass);
+    device_.destroyPipelineLayout(layout);
+    device_.destroyShaderModule(vert_shader_module);
+    device_.destroyShaderModule(frag_shader_module);
+    for(auto& image_view:image_views){
+        device_.destroyImageView(image_view);
+    }
     device_.destroySwapchainKHR(swapchain_);
     device_.destroy();
     instance_.destroySurfaceKHR(surface_);
@@ -190,4 +209,193 @@ void Render::getQueues()
 {
     graphics_queue = device_.getQueue(queue_family_indices.graphics_queue.value(), 0);
     present_queue = device_.getQueue(queue_family_indices.present_queue.value(), 0);
+}
+
+void Render::createImageViews()
+{
+    auto images = device_.getSwapchainImagesKHR(swapchain_);
+    image_views.resize(images.size());
+    for(size_t i=0;i<images.size();i++){
+        vk::ImageViewCreateInfo image_view_create_info;
+        vk::ComponentMapping component_mapping;
+
+        vk::ImageSubresourceRange subresource_range;
+
+        subresource_range.setBaseMipLevel(0)
+                         .setLevelCount(1)
+                         .setBaseArrayLayer(0)
+                         .setLayerCount(1)
+                         .setAspectMask(vk::ImageAspectFlagBits::eColor);
+
+        image_view_create_info.setImage(images[i])
+                              .setViewType(vk::ImageViewType::e2D)
+                              .setFormat(swapchain_info.image_format.format)
+                              .setComponents(component_mapping)
+                              .setSubresourceRange(subresource_range);
+        image_views[i] = device_.createImageView(image_view_create_info);
+    }
+}
+
+void Render::createFramebuffers()
+{
+    int width, height;
+    SDL_GetWindowSize(window_, &width, &height);
+    framebuffers.resize(image_views.size());
+    for(size_t i=0;i<image_views.size();i++){
+        vk::FramebufferCreateInfo framebuffer_create_info;
+        framebuffer_create_info.setRenderPass(render_pass)
+                               .setWidth(width)
+                               .setHeight(height)
+                               .setAttachments(image_views[i])
+                               .setLayers(1);
+        framebuffers[i] = device_.createFramebuffer(framebuffer_create_info);
+    }    
+}
+
+void Render::createShaderModules()
+{
+
+    auto readSource = [](const std::string& path)->std::string{
+        std::ifstream file(path, std::ios::ate | std::ios::binary);
+        if(!file.is_open()){
+            throw std::runtime_error("failed to open file!");
+        }
+        auto size = file.tellg();
+        std::string buffer(size,'\0');
+        file.seekg(0);
+        file.read(buffer.data(),size);
+        file.close();
+        return buffer;
+    };
+
+    vk::ShaderModuleCreateInfo vert_create_info;
+    std::string vert_sources_code = readSource("../shader/render.vert.spv");
+    vert_create_info.setCodeSize(vert_sources_code.size())
+                    .setPCode((uint32_t*)(vert_sources_code.data()));
+    vert_shader_module = device_.createShaderModule(vert_create_info);
+
+    vk::ShaderModuleCreateInfo frag_create_info;
+    std::string frag_sources_code = readSource("../shader/render.frag.spv");
+    frag_create_info.setCodeSize(frag_sources_code.size())
+                    .setPCode((uint32_t*)(frag_sources_code.data()));
+    frag_shader_module = device_.createShaderModule(frag_create_info);
+}
+
+void Render::createPipeline()
+{
+    vk::GraphicsPipelineCreateInfo pipeline_create_info;
+
+    // 1. vertex input
+    vk::PipelineVertexInputStateCreateInfo state_create_info;
+    pipeline_create_info.setPVertexInputState(&state_create_info);
+
+    // 2. vertex assembly
+    vk::PipelineInputAssemblyStateCreateInfo assembly_create_info;
+    assembly_create_info.setPrimitiveRestartEnable(false) // 是否启用顶点重绘
+                        .setTopology(vk::PrimitiveTopology::eTriangleList); // 连线方式 目前选择每三个点会连成三角形
+    pipeline_create_info.setPInputAssemblyState(&assembly_create_info);
+
+    // 3. shader
+    shader_stages.resize(2);
+    shader_stages[0].setStage(vk::ShaderStageFlagBits::eVertex)
+                                 .setModule(vert_shader_module)
+                                 .setPName("main");
+    shader_stages[1].setStage(vk::ShaderStageFlagBits::eFragment)
+                                 .setModule(frag_shader_module)
+                                 .setPName("main");
+    
+    pipeline_create_info.setStages(shader_stages);
+
+    // 4. viewport
+    vk::PipelineViewportStateCreateInfo viewport_state_create_info;
+    int width, height;
+    SDL_GetWindowSize(window_, &width, &height);
+    vk::Viewport viewport(0.,0.,width,height,0.,1.);
+    vk::Rect2D scissor(vk::Offset2D(0, 0), vk::Extent2D(static_cast<uint32_t>(width), static_cast<uint32_t>(height)));
+    viewport_state_create_info.setViewports(viewport)
+                        .setScissors(scissor);
+    pipeline_create_info.setPViewportState(&viewport_state_create_info);
+
+    // 5. rasterizer
+    vk::PipelineRasterizationStateCreateInfo rasterization_create_info;
+    rasterization_create_info.setRasterizerDiscardEnable(false)
+                             .setCullMode(vk::CullModeFlagBits::eBack)
+                             .setFrontFace(vk::FrontFace::eCounterClockwise)
+                             .setPolygonMode(vk::PolygonMode::eFill)
+                             .setLineWidth(1.0f);
+    pipeline_create_info.setPRasterizationState(&rasterization_create_info);
+
+    // 6. multisampling
+    vk::PipelineMultisampleStateCreateInfo multisampling_create_info;
+    multisampling_create_info.setSampleShadingEnable(false)
+                             .setRasterizationSamples(vk::SampleCountFlagBits::e1);
+    pipeline_create_info.setPMultisampleState(&multisampling_create_info);
+
+    // 7. test - stencil test, depth test
+
+    // 8. color blending
+    vk::PipelineColorBlendStateCreateInfo color_blend_create_info;
+    vk::PipelineColorBlendAttachmentState color_blend_attachment;
+    color_blend_attachment.setBlendEnable(false)
+                          .setColorWriteMask(vk::ColorComponentFlagBits::eR | 
+                                             vk::ColorComponentFlagBits::eG |
+                                             vk::ColorComponentFlagBits::eB |
+                                             vk::ColorComponentFlagBits::eA);
+    
+    color_blend_create_info.setLogicOpEnable(false)
+                           .setAttachments(color_blend_attachment);
+
+    pipeline_create_info.setPColorBlendState(&color_blend_create_info);
+
+    // 9. renderpass and layout
+    pipeline_create_info.setRenderPass(render_pass)
+                        .setLayout(layout);
+
+    auto res = device_.createGraphicsPipeline(nullptr, pipeline_create_info);
+    if (res.result != vk::Result::eSuccess){
+        throw std::runtime_error("failed to create graphics pipeline!");
+    }
+    pipeline = res.value;
+    
+}
+
+void Render::createPipelineLayout()
+{
+    vk::PipelineLayoutCreateInfo pipeline_layout_create_info;
+
+    layout = device_.createPipelineLayout(pipeline_layout_create_info);
+}
+
+void Render::createRenderPass()
+{
+    vk::RenderPassCreateInfo render_pass_create_info;
+    vk::AttachmentDescription color_attachment;
+    color_attachment.setFormat(swapchain_info.image_format.format)
+                    .setInitialLayout(vk::ImageLayout::eUndefined)
+                    .setFinalLayout(vk::ImageLayout::eColorAttachmentOptimal)
+                    .setLoadOp(vk::AttachmentLoadOp::eClear)
+                    .setStoreOp(vk::AttachmentStoreOp::eStore)
+                    .setStencilLoadOp(vk::AttachmentLoadOp::eDontCare)
+                    .setStencilStoreOp(vk::AttachmentStoreOp::eDontCare)
+                    .setSamples(vk::SampleCountFlagBits::e1);
+    render_pass_create_info.setAttachments(color_attachment);
+
+    vk::SubpassDescription subpass;
+    vk::AttachmentReference color_attachment_ref;
+    color_attachment_ref.setAttachment(0)
+                        .setLayout(vk::ImageLayout::eColorAttachmentOptimal);
+    subpass.setPipelineBindPoint(vk::PipelineBindPoint::eGraphics)
+           .setColorAttachments(color_attachment_ref);
+    render_pass_create_info.setSubpasses(subpass);
+
+    vk::SubpassDependency dependency; //多个subpass时，需要指定依赖关系,虽然只有一个subpass，但vulkan还有隐藏的subpass
+    dependency.setSrcSubpass(VK_SUBPASS_EXTERNAL)
+              .setDstSubpass(0)
+              .setDstAccessMask(vk::AccessFlagBits::eColorAttachmentWrite)
+              .setDstStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput)
+              .setSrcStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
+
+    render_pass_create_info.setDependencies(dependency);
+
+    render_pass = device_.createRenderPass(render_pass_create_info);
 }

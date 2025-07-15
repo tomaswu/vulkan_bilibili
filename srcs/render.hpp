@@ -40,8 +40,26 @@ class Render{
 
         SwapchainInfo swapchain_info;
 
+        std::vector<vk::ImageView> image_views;
+        std::vector<vk::Framebuffer> framebuffers;
+
+        vk::ShaderModule vert_shader_module;
+        vk::ShaderModule frag_shader_module;
+
+        vk::Pipeline pipeline;
+        vk::PipelineLayout layout;
+        vk::RenderPass render_pass;
+        std::vector<vk::PipelineShaderStageCreateInfo> shader_stages;
+
         void querySwapchainInfo(int width, int height);
 
         void queryQueueFamilyIndices();
         void getQueues();
+        void createImageViews();
+        void createFramebuffers();
+
+        void createShaderModules();
+        void createPipeline();
+        void createPipelineLayout();
+        void createRenderPass();
 };
