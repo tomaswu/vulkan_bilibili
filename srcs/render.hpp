@@ -1,11 +1,12 @@
 #include <vulkan/vulkan.hpp>
-#include <SDL3/SDL.h>
+#include <QWindow>
 #include <optional>
 #include "vertex.hpp"
+#include <QVulkanInstance>
 
 class Render{
     public:
-        Render(SDL_Window* window);
+        Render(QWindow* window);
         ~Render();
 
         void render();
@@ -16,7 +17,8 @@ class Render{
             float y = 0.5;
         // end test
 
-        SDL_Window* window_{nullptr};
+        QWindow* window_{nullptr};
+        QVulkanInstance *qinstance_{nullptr};
         vk::Instance instance_{nullptr};
         vk::SurfaceKHR surface_{nullptr};
         vk::PhysicalDevice physical_device_{nullptr};
@@ -82,4 +84,7 @@ class Render{
         void createCommandPool();
         void createFence();
         void createVertexBuffer();
+
+        // assistant functions
+        std::tuple<uint32_t, uint32_t> getWindowSize();
 };

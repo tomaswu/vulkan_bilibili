@@ -7,7 +7,7 @@
 #include <SDL3/SDL.h>
 #include <fstream>
 
-Render::Render(SDL_Window *window)
+Render::Render(QWindow *window)
 {
     window_ = window;
     auto app_info = vk::ApplicationInfo();
@@ -25,21 +25,33 @@ Render::Render(SDL_Window *window)
 
     unsigned int count{0};
     std::vector<const char*> extension_names;
-    auto extensions = SDL_Vulkan_GetInstanceExtensions(&count);
-    for(uint32_t i=0;i<count;i++){
-        std::cout << "extension: " << extensions[i] << std::endl;
-        extension_names.push_back(extensions[i]);
-    }
+
+    extension_names.push_back("VK_KHR_surface");
+    extension_names.push_back("VK_KHR_win32_surface");
 
     create_info.setEnabledExtensionCount(extension_names.size())
                .setPpEnabledExtensionNames(extension_names.data());
 
     instance_ = vk::createInstance(create_info);
     
-    VkSurfaceKHR c_surface;
-    auto ret = SDL_Vulkan_CreateSurface(window_, instance_, NULL, &c_surface);
-    if(!ret){
-        std::cout << "Failed to create Vulkan surface" << SDL_GetError() << std::endl;
+    qinstance_ = new QVulkanInstance();
+    qinstance_->setVkInstance(instance_);
+    if (!qinstance_->create()) {
+        std::cout << "无法创建QVulkanInstance" << std::endl;
+        throw std::runtime_error("无法创建QVulkanInstance");
+    }
+    
+    window_->setVulkanInstance(qinstance_);
+    
+    if (!window_->vulkanInstance()) {
+        std::cout << "无法设置vulkan实例到窗口" << std::endl;
+        throw std::runtime_error("无法设置vulkan实例到窗口");
+    }
+    
+    auto c_surface = qinstance_->surfaceForWindow(window_);
+
+    if(!c_surface){
+        std::cout << "Failed to create Vulkan surface" << std::endl;
         throw std::runtime_error("Failed to create Vulkan surface");
     }
     surface_ = c_surface;
@@ -102,8 +114,7 @@ Render::Render(SDL_Window *window)
     getQueues();
 
     // 创建交换链
-    int width, height;
-    SDL_GetWindowSize(window_, &width, &height);
+    auto [width, height] = getWindowSize();
     querySwapchainInfo(width, height);
     vk::SwapchainCreateInfoKHR swapchain_create_info;
     swapchain_create_info.setClipped(true)
@@ -196,8 +207,7 @@ void Render::render()
     memcpy(ptr,vertices.data(),vertex_buffer_size);
     device_.unmapMemory(vertex_buffer_memory);
 
-    int width,height;
-    SDL_GetWindowSize(window_, &width, &height);
+    auto [width, height] = getWindowSize();
     auto res = device_.acquireNextImageKHR(swapchain_, UINT64_MAX, image_available_semaphore, nullptr);
 
     if (res.result!=vk::Result::eSuccess){
@@ -329,8 +339,7 @@ void Render::createImageViews()
 
 void Render::createFramebuffers()
 {
-    int width, height;
-    SDL_GetWindowSize(window_, &width, &height);
+    auto [width, height] = getWindowSize();
     framebuffers.resize(image_views.size());
     for(size_t i=0;i<image_views.size();i++){
         vk::FramebufferCreateInfo framebuffer_create_info;
@@ -404,8 +413,7 @@ void Render::createPipeline()
 
     // 4. viewport
     vk::PipelineViewportStateCreateInfo viewport_state_create_info;
-    int width, height;
-    SDL_GetWindowSize(window_, &width, &height);
+    auto [width, height] = getWindowSize();
     vk::Viewport viewport(0.,0.,swapchain_info.extent.width,swapchain_info.extent.height,0.,1.);
     vk::Rect2D scissor(vk::Offset2D(0, 0), swapchain_info.extent);
     viewport_state_create_info.setViewports(viewport)
@@ -559,4 +567,9 @@ void Render::createVertexBuffer()
 
     device_.bindBufferMemory(vertex_buffer,vertex_buffer_memory,0);
 
+}
+
+std::tuple<uint32_t, uint32_t> Render::getWindowSize()
+{
+    return std::tuple<uint32_t, uint32_t>(window_->width(), window_->height());
 }
