@@ -183,6 +183,23 @@ Render::~Render()
 
 void Render::render()
 {
+    // 获取当前窗口大小
+    auto [width, height] = getWindowSize();
+    
+    // 检查窗口大小是否与交换链尺寸匹配，如果不匹配则更新
+    if (width != swapchain_info.extent.width || height != swapchain_info.extent.height) {
+        // 等待设备空闲
+        device_.waitIdle();
+        
+        // 更新交换链信息
+        querySwapchainInfo(width, height);
+        
+        // 重新创建帧缓冲区以匹配新尺寸
+        for (auto& framebuffer : framebuffers) {
+            device_.destroyFramebuffer(framebuffer);
+        }
+        createFramebuffers();
+    }
 
     y+=delata;
     if(y>1.0f){
@@ -202,12 +219,10 @@ void Render::render()
         std::swap(vertices[1], vertices[2]);
     }
     
-
     void* ptr = device_.mapMemory(vertex_buffer_memory,0,vertex_buffer_size);
     memcpy(ptr,vertices.data(),vertex_buffer_size);
     device_.unmapMemory(vertex_buffer_memory);
 
-    auto [width, height] = getWindowSize();
     auto res = device_.acquireNextImageKHR(swapchain_, UINT64_MAX, image_available_semaphore, nullptr);
 
     if (res.result!=vk::Result::eSuccess){
@@ -339,13 +354,13 @@ void Render::createImageViews()
 
 void Render::createFramebuffers()
 {
-    auto [width, height] = getWindowSize();
+    // 使用交换链信息中的尺寸，确保一致性
     framebuffers.resize(image_views.size());
     for(size_t i=0;i<image_views.size();i++){
         vk::FramebufferCreateInfo framebuffer_create_info;
         framebuffer_create_info.setRenderPass(render_pass)
-                               .setWidth(width)
-                               .setHeight(height)
+                               .setWidth(swapchain_info.extent.width)
+                               .setHeight(swapchain_info.extent.height)
                                .setAttachments(image_views[i])
                                .setLayers(1);
         framebuffers[i] = device_.createFramebuffer(framebuffer_create_info);
